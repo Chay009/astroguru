@@ -1,0 +1,1183 @@
+openapi: 3.0.3
+info:
+  title: Astrology App API
+  description: Backend API for the Astrology App, enabling astrology consultations with AI Gurus and related functionalities.
+  version: 1.0.0
+servers:
+  - url: https://api.astrologyapp.com/v1
+    description: Production server
+
+paths:
+  /auth/send_otp:
+    post:
+      summary: Send OTP to user's phone
+      description: Triggers the sending of a one-time password (OTP) to the specified phone number.
+      operationId: sendOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone:
+                  type: string
+                  description: User's phone number with country code (E.164 format)
+                  example: "+919876543210"
+              required:
+                - phone
+      responses:
+        '200':
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "OTP_SENT"
+                  expires_in:
+                    type: integer
+                    description: Time in seconds until OTP expires
+                    example: 300
+        '400':
+          description: Invalid phone number
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "INVALID_PHONE"
+                message: "The phone number format is incorrect."
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/verify-otp:
+    post:
+      summary: Verify OTP and authenticate user
+      description: Validates the OTP and returns a JWT token and user details upon successful authentication.
+      operationId: verifyOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone:
+                  type: string
+                  example: "+919876543210"
+                otp:
+                  type: string
+                  description: 6-digit OTP entered by the user
+                  example: "123456"
+              required:
+                - phone
+                - otp
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: JWT token for authentication
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  user:
+                    $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid OTP or phone number
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      summary: Invalidate current token
+      description: Logs out the user by invalidating the provided JWT token.
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "LOGGED_OUT"
+        '401':
+          description: Unauthorized (invalid or expired token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh-token:
+    post:
+      summary: Refresh access token
+      description: Generates a new JWT token using a valid refresh token.
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh_token:
+                  type: string
+                  description: Refresh token issued during login
+                  example: "REFRESH_TOKEN_STRING"
+              required:
+                - refresh_token
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: "NEW_JWT_TOKEN_STRING"
+        '400':
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /user/profile:
+    get:
+      summary: Fetch user profile
+      description: Returns the authenticated user's profile details.
+      operationId: getUserProfile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /user/update:
+    post:
+      summary: Update user profile
+      description: Allows the user to update their profile information.
+      operationId: updateUserProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: "Ravi"
+                dob:
+                  type: string
+                  format: date
+                  example: "1990-01-01"
+                gender:
+                  type: string
+                  enum: ["male", "female", "other"]
+                  example: "male"
+                time_of_birth:
+                  type: string
+                  example: "10:15"
+                location:
+                  $ref: '#/components/schemas/Location'
+              required: []
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "UPDATED"
+        '400':
+          description: Invalid data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /user/upload-profile-image:
+    post:
+      summary: Upload profile image
+      description: Uploads a profile image for the authenticated user.
+      operationId: uploadProfileImage
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (e.g., PNG, JPG)
+              required:
+                - file
+      responses:
+        '200':
+          description: Image uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile_image_url:
+                    type: string
+                    example: "https://cdn.example.com/image.png"
+        '400':
+          description: Invalid file type or size
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /user/history:
+    get:
+      summary: Retrieve user's session history
+      description: Returns a list of past sessions for the authenticated user.
+      operationId: getUserHistory
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+          required: false
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          required: false
+      responses:
+        '200':
+          description: History retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    session_id:
+                      type: string
+                      example: "abc123"
+                    guru_id:
+                      type: string
+                      example: "ai_vedic"
+                    type:
+                      type: string
+                      enum: ["chat", "video", "audio"]
+                      example: "chat"
+                    status:
+                      type: string
+                      enum: ["completed", "cancelled", "active"]
+                      example: "completed"
+
+  /gurus/{id}:
+    get:
+      summary: Fetch Guru details
+      description: Retrieves information about an AI Guru by ID.
+      operationId: getGuru
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "ai_smart_match_01"
+      responses:
+        '200':
+          description: Guru details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guru'
+        '404':
+          description: Guru not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /gurus/{id}/availability:
+    get:
+      summary: Get Guru availability
+      description: Returns the availability schedule for a Guru.
+      operationId: getGuruAvailability
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Availability retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  availability:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        start:
+                          type: string
+                          format: date-time
+                          example: "2025-04-01T10:00:00Z"
+                        end:
+                          type: string
+                          format: date-time
+                          example: "2025-04-01T13:00:00Z"
+
+  /gurus/{id}/reviews:
+    get:
+      summary: Fetch Guru reviews
+      description: Retrieves reviews for a specific Guru.
+      operationId: getGuruReviews
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reviews retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    user_id:
+                      type: string
+                      example: "user_123"
+                    rating:
+                      type: integer
+                      minimum: 1
+                      maximum: 5
+                      example: 5
+                    comment:
+                      type: string
+                      example: "Very insightful session."
+                    timestamp:
+                      type: string
+                      format: date-time
+                      example: "2025-03-31T11:30:00Z"
+
+  /reviews:
+    post:
+      summary: Submit Guru review
+      description: Allows users to submit a review after a session.
+      operationId: submitReview
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                guru_id:
+                  type: string
+                  example: "ai_smart_match_01"
+                session_id:
+                  type: string
+                  example: "abc123"
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  example: 5
+                comment:
+                  type: string
+                  example: "Great advice and clarity."
+              required:
+                - guru_id
+                - session_id
+                - rating
+      responses:
+        '200':
+          description: Review submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "REVIEW_SUBMITTED"
+
+  /guru/suggest:
+    post:
+      summary: Suggest best-fit Guru
+      description: Recommends a Guru based on user preferences.
+      operationId: suggestGuru
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                intent:
+                  type: string
+                  example: "career"
+                language:
+                  type: string
+                  example: "Hindi"
+                mood:
+                  type: string
+                  example: "calm"
+      responses:
+        '200':
+          description: Guru suggested
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  guru_id:
+                    type: string
+                    example: "ai_smart_match_01"
+                  interaction_type:
+                    type: string
+                    enum: ["new", "continue"]
+                    example: "new"
+
+  /sessions/book:
+    post:
+      summary: Book a session
+      description: Schedules a session with a specified Guru.
+      operationId: bookSession
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                guru_id:
+                  type: string
+                  example: "ai_smart_match_01"
+                type:
+                  type: string
+                  enum: ["chat", "video", "audio"]
+                  example: "chat"
+                scheduled_time:
+                  type: string
+                  format: date-time
+                  example: "2025-04-01T13:00:00Z"
+              required:
+                - guru_id
+                - type
+      responses:
+        '200':
+          description: Session booked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                    example: "abc123"
+                  status:
+                    type: string
+                    example: "BOOKED"
+
+  /sessions/{id}:
+    get:
+      summary: Fetch session details
+      description: Retrieves details of a specific session.
+      operationId: getSession
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: "abc123"
+      responses:
+        '200':
+          description: Session details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+
+  /sessions/{id}/summary:
+    get:
+      summary: Get session summary
+      description: Provides a summary of the session.
+      operationId: getSessionSummary
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Summary retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summary:
+                    type: string
+                    example: "The session focused on career advice..."
+
+  /chat/start:
+    post:
+      summary: Start chat session
+      description: Initiates a chat session with a Guru.
+      operationId: startChat
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                guru_id:
+                  type: string
+                  example: "ai_smart_match_01"
+              required:
+                - guru_id
+      responses:
+        '200':
+          description: Chat started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                    example: "abc123"
+
+  /chat/send:
+    post:
+      summary: Send chat message
+      description: Sends a message to the Guru in an active session.
+      operationId: sendChatMessage
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_id:
+                  type: string
+                  example: "abc123"
+                message:
+                  type: string
+                  example: "Should I change my job this year?"
+                type:
+                  type: string
+                  enum: ["text", "image", "voice"]
+                  example: "text"
+                message_id:
+                  type: string
+                  example: "uuid-1234"
+              required:
+                - session_id
+                - message
+                - type
+                - message_id
+      responses:
+        '200':
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "SENT"
+
+  /chat/messages:
+    get:
+      summary: Fetch chat history
+      description: Retrieves message history for a session.
+      operationId: getChatMessages
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: session_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          required: false
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          required: false
+      responses:
+        '200':
+          description: Messages retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+
+  /chat/ack:
+    post:
+      summary: Acknowledge message status
+      description: Updates the delivery or read status of a message.
+      operationId: acknowledgeMessage
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_id:
+                  type: string
+                  example: "abc123"
+                message_id:
+                  type: string
+                  example: "msg001"
+                status:
+                  type: string
+                  enum: ["delivered", "read"]
+                  example: "delivered"
+              required:
+                - session_id
+                - message_id
+                - status
+      responses:
+        '200':
+          description: Acknowledgment successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ACKNOWLEDGED"
+
+  /chat/react:
+    post:
+      summary: React to a message
+      description: Adds a reaction to a specific message.
+      operationId: reactToMessage
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message_id:
+                  type: string
+                  example: "msg001"
+                reaction:
+                  type: string
+                  example: "❤️"
+              required:
+                - message_id
+                - reaction
+      responses:
+        '200':
+          description: Reaction added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "REACTION_ADDED"
+
+  /chat/typing:
+    post:
+      summary: Send typing indicator
+      description: Notifies the Guru of the user's typing status.
+      operationId: sendTypingIndicator
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                session_id:
+                  type: string
+                  example: "abc123"
+                is_typing:
+                  type: boolean
+                  example: true
+              required:
+                - session_id
+                - is_typing
+      responses:
+        '200':
+          description: Typing status sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "TYPING_STATUS_SENT"
+
+  /wallet:
+    get:
+      summary: Fetch wallet balance
+      description: Retrieves the user's current wallet balance.
+      operationId: getWallet
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Wallet details retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balance:
+                    type: number
+                    format: float
+                    example: 100.0
+                  currency:
+                    type: string
+                    example: "USD"
+
+  /wallet/recharge:
+    post:
+      summary: Recharge wallet
+      description: Adds funds to the user's wallet.
+      operationId: rechargeWallet
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: number
+                  format: float
+                  example: 50.0
+                payment_method:
+                  type: string
+                  enum: ["credit_card", "debit_card", "upi"]
+                  example: "credit_card"
+                payment_details:
+                  type: object
+                  additionalProperties: true
+                  example: { "card_number": "4111111111111111" }
+              required:
+                - amount
+                - payment_method
+      responses:
+        '200':
+          description: Wallet recharged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "RECHARGED"
+                  new_balance:
+                    type: number
+                    format: float
+                    example: 150.0
+
+  /wallet/transactions:
+    get:
+      summary: Fetch wallet transactions
+      description: Retrieves a list of wallet transactions.
+      operationId: getWalletTransactions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Transactions retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    transaction_id:
+                      type: string
+                      example: "tx123"
+                    type:
+                      type: string
+                      enum: ["recharge", "session_payment"]
+                      example: "recharge"
+                    amount:
+                      type: number
+                      format: float
+                      example: 50.0
+                    timestamp:
+                      type: string
+                      format: date-time
+                      example: "2025-04-01T14:00:00Z"
+
+  /notifications:
+    get:
+      summary: Fetch user notifications
+      description: Retrieves a list of notifications for the authenticated user.
+      operationId: getNotifications
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Notifications retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    notification_id:
+                      type: string
+                      example: "notif001"
+                    type:
+                      type: string
+                      example: "sessionнице_reminder"
+                    message:
+                      type: string
+                      example: "Your session starts in 10 minutes."
+                    timestamp:
+                      type: string
+                      format: date-time
+                      example: "2025-04-01T12:50:00Z"
+                    read:
+                      type: boolean
+                      example: false
+
+  /support/contact:
+    post:
+      summary: Contact support
+      description: Submits a support request from the user.
+      operationId: contactSupport
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subject:
+                  type: string
+                  example: "Issue with session"
+                message:
+                  type: string
+                  example: "I had a problem during my last session..."
+              required:
+                - subject
+                - message
+      responses:
+        '200':
+          description: Support request submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "SUPPORT_REQUEST_SUBMITTED"
+
+  /report:
+    post:
+      summary: Report an issue
+      description: Allows users to report problems or inappropriate content.
+      operationId: submitReport
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: ["content", "technical"]
+                  example: "content"
+                details:
+                  type: string
+                  example: "Inappropriate message in session abc123"
+                session_id:
+                  type: string
+                  example: "abc123"
+              required:
+                - type
+                - details
+      responses:
+        '200':
+          description: Report submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "REPORT_SUBMITTED"
+
+  /events:
+    post:
+      summary: Log analytics event
+      description: Records user interactions for analytics purposes.
+      operationId: logEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event:
+                  type: string
+                  example: "chat.opened"
+                user_id:
+                  type: string
+                  example: "user_123"
+                session_id:
+                  type: string
+                  example: "abc123"
+                timestamp:
+                  type: string
+                  format: date-time
+                  example: "2025-04-01T13:00:00Z"
+                meta:
+                  type: object
+                  additionalProperties: true
+                  example: { "screen": "home", "source": "banner" }
+              required:
+                - event
+                - user_id
+                - timestamp
+      responses:
+        '200':
+          description: Event logged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "EVENT_LOGGED"
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        user_id:
+          type: string
+          example: "user_123"
+        username:
+          type: string
+          example: "Ravi"
+        dob:
+          type: string
+          format: date
+          example: "1990-01-01"
+        gender:
+          type: string
+          enum: ["male", "female", "other"]
+          example: "male"
+        time_of_birth:
+          type: string
+          example: "10:15"
+        profile_image_url:
+          type: string
+          example: "https://cdn.example.com/image.png"
+        location:
+          $ref: '#/components/schemas/Location'
+      required:
+        - user_id
+        - username
+        - dob
+        - gender
+        - location
+
+    Guru:
+      type: object
+      properties:
+        guru_id:
+          type: string
+          example: "ai_smart_match_01"
+        name:
+          type: string
+          example: "Vedic Master"
+        avatar_url:
+          type: string
+          example: "https://cdn.example.com/vedicmaster.png"
+        languages:
+          type: array
+          items:
+            type: string
+          example: ["Hindi", "English"]
+        expertise:
+          type: array
+          items:
+            type: string
+          example: ["Vedic", "Numerology"]
+        rating:
+          type: number
+          format: float
+          example: 4.8
+        review_count:
+          type: integer
+          example: 230
+        model_config:
+          type: object
+          properties:
+            temperature:
+              type: number
+              format: float
+              example: 0.7
+            persona_profile_id:
+              type: string
+              example: "astro_friendly"
+            memory_enabled:
+              type: boolean
+              example: true
+      required:
+        - guru_id
+        - name
+        - languages
+        - expertise
+
+    Session:
+      type: object
+      properties:
+        session_id:
+          type: string
+          example: "abc123"
+        user_id:
+          type: string
+          example: "user_123"
+        guru_id:
+          type: string
+          example: "ai_smart_match_01"
+        type:
+          type: string
+          enum: ["chat", "video", "audio"]
+          example: "chat"
+        status:
+          type: string
+          enum: ["active", "completed", "cancelled"]
+          example: "active"
+        start_time:
+          type: string
+          format: date-time
+          example: "2025-04-01T13:00:00Z"
+        end_time:
+          type: string
+          format: date-time
+          example: null
+        duration_minutes:
+          type: integer
+          example: null
+        cost:
+          type: number
+          format:
