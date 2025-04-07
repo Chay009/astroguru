@@ -13,6 +13,8 @@ paths:
       summary: Send OTP for Registration or Login
       description: Sends a one-time password (OTP) to the user's phone number. Used for both new user registration and existing user login.
       operationId: sendOtp
+      tags:
+        - auth
       requestBody:
         required: true
         content:
@@ -62,6 +64,8 @@ paths:
       summary: Verify OTP and Register/Login User
       description: Verifies the OTP. If the user doesn’t exist, registers them with the provided phone number and minimal details. If the user exists, logs them in. Returns a JWT token and user details. Refresh tokens are managed internally and included in the user object.
       operationId: verifyOtp
+      tags:
+        - auth
       requestBody:
         required: true
         content:
@@ -114,6 +118,8 @@ paths:
       summary: Logout User
       description: Invalidates the current JWT token, effectively logging the user out. Requires a valid token in the Authorization header, which is validated server-side.
       operationId: logout
+      tags:
+        - auth
       security:
         - bearerAuth: []
       responses:
@@ -139,6 +145,8 @@ paths:
       summary: Fetch User Profile
       description: Returns the authenticated user's profile details. Requires a valid JWT token, validated server-side.
       operationId: getUserProfile
+      tags:
+        - user
       security:
         - bearerAuth: []
       responses:
@@ -160,6 +168,8 @@ paths:
       summary: Update User Profile
       description: Allows the user to update their profile information. Fields like refresh_tokens and guru_ids_interacted are managed server-side. Requires a valid JWT token, validated server-side.
       operationId: updateUserProfile
+      tags:
+        - user
       security:
         - bearerAuth: []
       requestBody:
@@ -212,6 +222,98 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
+  /locations/suggestions:
+    get:
+      summary: Get real-time location suggestions
+      description: Returns a list of location suggestions based on partial input as the user types (minimum 2 characters).
+      operationId: getLocationSuggestions
+      tags:
+        - location search
+      parameters:
+        - name: query
+          in: query
+          description: Partial location name entered by the user (minimum 2 characters)
+          required: true
+          schema:
+            type: string
+            minLength: 2
+            example: "Lon"
+        - name: limit
+          in: query
+          description: Maximum number of suggestions to return (default 10)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+            example: 5
+      responses:
+        '200':
+          description: Successful response with location suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          description: Unique identifier for the location
+                          example: 1
+                        name:
+                          type: string
+                          description: Full name of the location
+                          example: "London"
+                        country:
+                          type: string
+                          description: Country of the location
+                          example: "United Kingdom"
+                    description: List of matching locations
+                required:
+                  - suggestions
+              example:
+                suggestions:
+                  - id: 1
+                    name: "London"
+                    country: "United Kingdom"
+                  - id: 2
+                    name: "Long Beach"
+                    country: "United States"
+                  - id: 3
+                    name: "Londoño"
+                    country: "Colombia"
+        '400':
+          description: Invalid input (e.g., query less than 2 characters)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Query must be at least 2 characters long"
+        '429':
+          description: Too many requests (rate limit exceeded)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Rate limit exceeded. Please try again later."
+      x-rate-limit:
+        limit: 100
+        window: 60
+        description: 100 requests per minute per client
+
+
 
 components:
   schemas:
