@@ -225,20 +225,42 @@ paths:
 
   /locations/suggestions:
     get:
-      summary: Get real-time location suggestions
-      description: Returns a list of location suggestions based on partial input as the user types (minimum 2 characters).
+      summary: Get location suggestions
+      description: |
+        Returns a list of suggestions for cities, states, and countries based on partial input as the user types (minimum 2 characters). The suggestions are derived from a database of location data.
+
+        ### Database Schema
+        The underlying data is stored in a table called `locations` with the following structure:
+        
+        - **id**: `INT`, Primary key, auto-incremented (unique identifier for each record).
+        - **city_name**: `VARCHAR(100)`, Nullable, the name of the city (e.g., "Profesor Roberto Barrios").
+        - **state_name**: `VARCHAR(100)`, Nullable, the name of the state or region (e.g., "Chiapas").
+        - **country_name**: `VARCHAR(100)`, Not null, the name of the country (e.g., "Mexico").
+        - **latitude**: `DECIMAL(10,5)`, Nullable, the latitude coordinate (e.g., 17.32583).
+        - **longitude**: `DECIMAL(10,5)`, Nullable, the longitude coordinate (e.g., -91.92639).
+        - **timezone**: `VARCHAR(50)`, Nullable, the timezone (e.g., "America/Mexico_City").
+        - **utc_offset**: `INT`, Nullable, the UTC offset in hours (e.g., -6).
+        
+        Indexes:
+        - `idx_city` on `city_name` for faster city name searches.
+        - `idx_state` on `state_name` for faster state name searches.
+        - `idx_country` on `country_name` for faster country name searches.
+
+        ### Notes
+        - The API searches across `city_name`, `state_name`, and `country_name` for matches.
+        - Fields like `latitude`, `longitude`, `timezone`, and `utc_offset` are stored but not returned in the response to keep it lightweight.
       operationId: getLocationSuggestions
       tags:
         - location search
       parameters:
         - name: query
           in: query
-          description: Partial location name entered by the user (minimum 2 characters)
+          description: Partial name of a city, state, or country (minimum 2 characters)
           required: true
           schema:
             type: string
             minLength: 2
-            example: "Lon"
+            example: "Chi"
         - name: limit
           in: query
           description: Maximum number of suggestions to return (default 10)
@@ -249,6 +271,14 @@ paths:
             maximum: 50
             default: 10
             example: 5
+        - name: type
+          in: query
+          description: Optional filter to limit suggestions to a specific type (city, state, or country)
+          required: false
+          schema:
+            type: string
+            enum: ["city", "state", "country"]
+            example: "city"
       responses:
         '200':
           description: Successful response with location suggestions
@@ -262,34 +292,42 @@ paths:
                     items:
                       type: object
                       properties:
-                        id:
-                          type: integer
-                          description: Unique identifier for the location
-                          example: 1
-                        name:
+                        city_name:
                           type: string
-                          description: Full name of the location
-                          example: "London"
-                        country:
+                          description: Name of the city
+                          example: "Profesor Roberto Barrios"
+                        state_name:
                           type: string
-                          description: Country of the location
-                          example: "United Kingdom"
-                    description: List of matching locations
+                          description: Name of the state
+                          example: "Chiapas"
+                        country_name:
+                          type: string
+                          description: Name of the country
+                          example: "Mexico"
+                        type:
+                          type: string
+                          enum: ["city", "state", "country"]
+                          description: Type of the suggestion
+                          example: "city"
+                    description: List of matching location suggestions
                 required:
                   - suggestions
               example:
                 suggestions:
-                  - id: 1
-                    name: "London"
-                    country: "United Kingdom"
-                  - id: 2
-                    name: "Long Beach"
-                    country: "United States"
-                  - id: 3
-                    name: "Londoño"
-                    country: "Colombia"
+                  - city_name: "Profesor Roberto Barrios"
+                    state_name: "Chiapas"
+                    country_name: "Mexico"
+                    type: "city"
+                  - city_name: null
+                    state_name: "Chiapas"
+                    country_name: "Mexico"
+                    type: "state"
+                  - city_name: null
+                    state_name: null
+                    country_name: "China"
+                    type: "country"
         '400':
-          description: Invalid input (e.g., query less than 2 characters)
+          description: Bad request due to missing or invalid query (e.g., less than 2 characters)
           content:
             application/json:
               schema:
@@ -298,6 +336,16 @@ paths:
                   error:
                     type: string
                     example: "Query must be at least 2 characters long"
+        '404':
+          description: No matching cities, states, or countries found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "No matching locations found"
         '429':
           description: Too many requests (rate limit exceeded)
           content:
@@ -312,7 +360,6 @@ paths:
         limit: 100
         window: 60
         description: 100 requests per minute per client
-
 
 
 components:
